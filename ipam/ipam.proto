@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package ipam.v1;
+
+option go_package = "rheincni/ipam/gen/ipamv1;ipamv1";
+
+import "google/protobuf/empty.proto";
+
+message AllocateIPRequest {
+  sfixed32 host_eth_index = 1;
+}
+
+message IP {
+  sfixed32 ip = 1;
+}
+
+service IPAMService {
+  rpc AllocateIP(AllocateIPRequest) returns (IP);
+  rpc DeallocateIP(IP)              returns (google.protobuf.Empty);
+}

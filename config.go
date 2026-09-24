@@ -1,6 +1,7 @@
-package main
+package rheincni
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,21 @@ type EnvConfiguration struct {
 	Ifname      string
 	Args        string
 	CniPath     string
+}
+
+func (c *CNICommand) String() string {
+	switch *c {
+	case CNICommand_ADD:
+		return "ADD"
+	case CNICommand_DEL:
+		return "DEL"
+	case CNICommand_CHECK:
+		return "CHECK"
+	case CNICommand_VERSION:
+		return "VERSION"
+	default:
+		return fmt.Sprintf("unknown cni command: %d", *c)
+	}
 }
 
 func ParseEnv(c *EnvConfiguration) error {
@@ -54,5 +70,10 @@ type CniConfiguration struct {
 }
 
 func ParseJsonInput(r io.Reader, c *CniConfiguration) error {
-	return json.NewDecoder(r).Decode(c)
+	bts, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	os.Stderr.Write(bts)
+	return json.NewDecoder(bytes.NewReader(bts)).Decode(c)
 }

@@ -7,6 +7,10 @@ kind_config="$config_dir/kind.yaml"
 cni_config="$config_dir/10-rheincni.conf"
 kubeconfig="$config_dir/kubeconfig"
 plugin_binary="$config_dir/bin/rheincni"
+ipam_binary="$config_dir/bin/rheincni-ipam"
+ipam_image="rheincni-ipam:dev"
+ipam_dockerfile="$repo_dir/deploy/ipam-agent.Dockerfile"
+ipam_manifest="$repo_dir/deploy/ipam-agent.yaml"
 cluster_name="${KIND_CLUSTER_NAME:-rheincni}"
 action="${1:-up}"
 
@@ -35,6 +39,7 @@ esac
 require_command kind
 require_command docker
 require_command go
+require_command kubectl
 
 if ! docker info >/dev/null 2>&1; then
   printf 'Docker is not available. Start the Docker daemon and try again.\n' >&2
@@ -56,8 +61,22 @@ printf 'Building rheincni for linux/%s...\n' "$node_arch"
   cd "$repo_dir"
   GOOS=linux GOARCH="$node_arch" CGO_ENABLED=1 \
     go build -ldflags='-linkmode external -extldflags -static' \
-    -o "$plugin_binary" .
+    -o "$plugin_binary" ./cmd/cni
 )
+
+printf 'Building rheincni IPAM agent for linux/%s...\n' "$node_arch"
+(
+  cd "$repo_dir"
+  GOOS=linux GOARCH="$node_arch" CGO_ENABLED=0 \
+    go build -trimpath -o "$ipam_binary" ./cmd/ipam
+)
+
+printf 'Building %s...\n' "$ipam_image"
+docker build \
+  --platform "linux/$node_arch" \
+  --file "$ipam_dockerfile" \
+  --tag "$ipam_image" \
+  "$config_dir/bin"
 
 if [[ ! -e "$kind_config" ]]; then
   cat >"$kind_config" <<'EOF'
@@ -109,6 +128,17 @@ for node in $nodes; do
   '
 done
 
+printf 'Loading %s into kind cluster %s...\n' "$ipam_image" "$cluster_name"
+kind load docker-image --name "$cluster_name" "$ipam_image"
+
+printf 'Applying rheincni IPAM agent manifests...\n'
+kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" \
+  apply -f "$ipam_manifest"
+kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" \
+  rollout restart daemonset/rheincni-ipam --namespace kube-system
+kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" \
+  rollout status daemonset/rheincni-ipam --namespace kube-system --timeout=120s
+
 for node in $nodes; do
   printf 'Installing rheincni on %s...\n' "$node"
   docker exec "$node" mkdir -p /opt/cni/bin /etc/cni/net.d
@@ -124,6 +154,4 @@ if ! docker exec -e CNI_COMMAND=VERSION "$first_node" /opt/cni/bin/rheincni \
     >"$config_dir/version-output" 2>&1; then
   printf 'Warning: rheincni failed the CNI VERSION command; pod networking will fail until the plugin implements CNI.\n' >&2
 fi
-if command -v kubectl >/dev/null 2>&1; then
-  kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" get nodes
-fi
+kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" get nodes

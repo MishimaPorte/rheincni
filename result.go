@@ -1,7 +1,8 @@
-package main
+package rheincni
 
 type Interface struct {
 	Name    string `json:"name"`
+	Mac     Mac    `json:"mac"`
 	Sandbox string `json:"sandbox,omitemtpy"`
 }
 type Ip struct {
