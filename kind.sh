@@ -68,7 +68,7 @@ printf 'Building rheincni IPAM agent for linux/%s...\n' "$node_arch"
 (
   cd "$repo_dir"
   GOOS=linux GOARCH="$node_arch" CGO_ENABLED=1 \
-    go build -trimpath -ldflags='-linkmode external -extldflags -static' \
+    go build -tags netgo,osusergo -trimpath -ldflags='-linkmode external -extldflags -static' \
     -o "$ipam_binary" ./cmd/ipam
 )
 

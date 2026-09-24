@@ -118,6 +118,66 @@ func (x *IP) GetGw() uint32 {
 	return 0
 }
 
+type IPAMInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subnet        uint32                 `protobuf:"fixed32,1,opt,name=subnet,proto3" json:"subnet,omitempty"`
+	SubnetPrefix  uint32                 `protobuf:"fixed32,2,opt,name=subnet_prefix,json=subnetPrefix,proto3" json:"subnet_prefix,omitempty"`
+	Gw            uint32                 `protobuf:"fixed32,3,opt,name=gw,proto3" json:"gw,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IPAMInfo) Reset() {
+	*x = IPAMInfo{}
+	mi := &file_ipam_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IPAMInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IPAMInfo) ProtoMessage() {}
+
+func (x *IPAMInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_ipam_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IPAMInfo.ProtoReflect.Descriptor instead.
+func (*IPAMInfo) Descriptor() ([]byte, []int) {
+	return file_ipam_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IPAMInfo) GetSubnet() uint32 {
+	if x != nil {
+		return x.Subnet
+	}
+	return 0
+}
+
+func (x *IPAMInfo) GetSubnetPrefix() uint32 {
+	if x != nil {
+		return x.SubnetPrefix
+	}
+	return 0
+}
+
+func (x *IPAMInfo) GetGw() uint32 {
+	if x != nil {
+		return x.Gw
+	}
+	return 0
+}
+
 var File_ipam_proto protoreflect.FileDescriptor
 
 const file_ipam_proto_rawDesc = "" +
@@ -128,8 +188,13 @@ const file_ipam_proto_rawDesc = "" +
 	"\x0ehost_eth_index\x18\x01 \x01(\x0fR\fhostEthIndex\"$\n" +
 	"\x02IP\x12\x0e\n" +
 	"\x02ip\x18\x01 \x01(\aR\x02ip\x12\x0e\n" +
-	"\x02gw\x18\x02 \x01(\aR\x02gw2y\n" +
-	"\vIPAMService\x125\n" +
+	"\x02gw\x18\x02 \x01(\aR\x02gw\"W\n" +
+	"\bIPAMInfo\x12\x16\n" +
+	"\x06subnet\x18\x01 \x01(\aR\x06subnet\x12#\n" +
+	"\rsubnet_prefix\x18\x02 \x01(\aR\fsubnetPrefix\x12\x0e\n" +
+	"\x02gw\x18\x03 \x01(\aR\x02gw2\xaf\x01\n" +
+	"\vIPAMService\x124\n" +
+	"\aGetInfo\x12\x16.google.protobuf.Empty\x1a\x11.ipam.v1.IPAMInfo\x125\n" +
 	"\n" +
 	"AllocateIP\x12\x1a.ipam.v1.AllocateIPRequest\x1a\v.ipam.v1.IP\x123\n" +
 	"\fDeallocateIP\x12\v.ipam.v1.IP\x1a\x16.google.protobuf.EmptyB!Z\x1frheincni/ipam/gen/ipamv1;ipamv1b\x06proto3"
@@ -146,19 +211,22 @@ func file_ipam_proto_rawDescGZIP() []byte {
 	return file_ipam_proto_rawDescData
 }
 
-var file_ipam_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_ipam_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_ipam_proto_goTypes = []any{
 	(*AllocateIPRequest)(nil), // 0: ipam.v1.AllocateIPRequest
 	(*IP)(nil),                // 1: ipam.v1.IP
-	(*emptypb.Empty)(nil),     // 2: google.protobuf.Empty
+	(*IPAMInfo)(nil),          // 2: ipam.v1.IPAMInfo
+	(*emptypb.Empty)(nil),     // 3: google.protobuf.Empty
 }
 var file_ipam_proto_depIdxs = []int32{
-	0, // 0: ipam.v1.IPAMService.AllocateIP:input_type -> ipam.v1.AllocateIPRequest
-	1, // 1: ipam.v1.IPAMService.DeallocateIP:input_type -> ipam.v1.IP
-	1, // 2: ipam.v1.IPAMService.AllocateIP:output_type -> ipam.v1.IP
-	2, // 3: ipam.v1.IPAMService.DeallocateIP:output_type -> google.protobuf.Empty
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	3, // 0: ipam.v1.IPAMService.GetInfo:input_type -> google.protobuf.Empty
+	0, // 1: ipam.v1.IPAMService.AllocateIP:input_type -> ipam.v1.AllocateIPRequest
+	1, // 2: ipam.v1.IPAMService.DeallocateIP:input_type -> ipam.v1.IP
+	2, // 3: ipam.v1.IPAMService.GetInfo:output_type -> ipam.v1.IPAMInfo
+	1, // 4: ipam.v1.IPAMService.AllocateIP:output_type -> ipam.v1.IP
+	3, // 5: ipam.v1.IPAMService.DeallocateIP:output_type -> google.protobuf.Empty
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -175,7 +243,7 @@ func file_ipam_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ipam_proto_rawDesc), len(file_ipam_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

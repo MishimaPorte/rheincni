@@ -12,8 +12,9 @@ import (
 )
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"math"
+	"net/netip"
 )
 
 type Mac [6]byte
@@ -35,12 +36,10 @@ func (m MacPair) String() string {
 type IP uint32
 
 func (i IP) String() string {
-	// on bad-endian systems this will be bad
-	ip := (*[4]byte)(unsafe.Pointer(&i))
 	return fmt.Sprintf(
 		"%d.%d.%d.%d",
-		ip[0], ip[1],
-		ip[2], ip[3],
+		byte(i>>24), byte(i>>16),
+		byte(i>>8), byte(i),
 	)
 }
 
@@ -49,12 +48,28 @@ type IPSubnet struct {
 	Prefix uint8
 }
 
+func ParseIPSubnet(cidr string) (IPSubnet, error) {
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		return IPSubnet{}, fmt.Errorf("parse pod CIDR %q: %w", cidr, err)
+	}
+	if !prefix.Addr().Is4() {
+		return IPSubnet{}, fmt.Errorf("pod CIDR %q is not IPv4", cidr)
+	}
+	if prefix.Bits() > 30 {
+		return IPSubnet{}, fmt.Errorf("pod CIDR %q has no room for a gateway and a pod", cidr)
+	}
+	prefix = prefix.Masked()
+	addr := prefix.Addr().As4()
+	return IPSubnet{IP: IP(binary.BigEndian.Uint32(addr[:])), Prefix: uint8(prefix.Bits())}, nil
+}
+
 func (i IPSubnet) Top() IP {
-	return i.IP | IP(math.Pow(float64(32-i.Prefix), 2)-1)
+	return i.Bottom() | IP(^(^uint32(0) << (32 - i.Prefix)))
 }
 
 func (i IPSubnet) Bottom() IP {
-	return i.IP & (IP(math.Pow(float64(32-i.Prefix), 2)-1) ^ 0xffffffff)
+	return i.IP & IP(^uint32(0)<<(32-i.Prefix))
 }
 
 func (i IPSubnet) String() string {

@@ -20,6 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	IPAMService_GetInfo_FullMethodName      = "/ipam.v1.IPAMService/GetInfo"
 	IPAMService_AllocateIP_FullMethodName   = "/ipam.v1.IPAMService/AllocateIP"
 	IPAMService_DeallocateIP_FullMethodName = "/ipam.v1.IPAMService/DeallocateIP"
 )
@@ -28,6 +29,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IPAMServiceClient interface {
+	GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IPAMInfo, error)
 	AllocateIP(ctx context.Context, in *AllocateIPRequest, opts ...grpc.CallOption) (*IP, error)
 	DeallocateIP(ctx context.Context, in *IP, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -38,6 +40,16 @@ type iPAMServiceClient struct {
 
 func NewIPAMServiceClient(cc grpc.ClientConnInterface) IPAMServiceClient {
 	return &iPAMServiceClient{cc}
+}
+
+func (c *iPAMServiceClient) GetInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IPAMInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IPAMInfo)
+	err := c.cc.Invoke(ctx, IPAMService_GetInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *iPAMServiceClient) AllocateIP(ctx context.Context, in *AllocateIPRequest, opts ...grpc.CallOption) (*IP, error) {
@@ -64,6 +76,7 @@ func (c *iPAMServiceClient) DeallocateIP(ctx context.Context, in *IP, opts ...gr
 // All implementations must embed UnimplementedIPAMServiceServer
 // for forward compatibility.
 type IPAMServiceServer interface {
+	GetInfo(context.Context, *emptypb.Empty) (*IPAMInfo, error)
 	AllocateIP(context.Context, *AllocateIPRequest) (*IP, error)
 	DeallocateIP(context.Context, *IP) (*emptypb.Empty, error)
 	mustEmbedUnimplementedIPAMServiceServer()
@@ -76,6 +89,9 @@ type IPAMServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIPAMServiceServer struct{}
 
+func (UnimplementedIPAMServiceServer) GetInfo(context.Context, *emptypb.Empty) (*IPAMInfo, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetInfo not implemented")
+}
 func (UnimplementedIPAMServiceServer) AllocateIP(context.Context, *AllocateIPRequest) (*IP, error) {
 	return nil, status.Error(codes.Unimplemented, "method AllocateIP not implemented")
 }
@@ -101,6 +117,24 @@ func RegisterIPAMServiceServer(s grpc.ServiceRegistrar, srv IPAMServiceServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&IPAMService_ServiceDesc, srv)
+}
+
+func _IPAMService_GetInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IPAMServiceServer).GetInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IPAMService_GetInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IPAMServiceServer).GetInfo(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _IPAMService_AllocateIP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -146,6 +180,10 @@ var IPAMService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "ipam.v1.IPAMService",
 	HandlerType: (*IPAMServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetInfo",
+			Handler:    _IPAMService_GetInfo_Handler,
+		},
 		{
 			MethodName: "AllocateIP",
 			Handler:    _IPAMService_AllocateIP_Handler,

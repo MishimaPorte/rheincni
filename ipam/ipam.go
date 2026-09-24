@@ -302,6 +302,13 @@ func (s *IPAMService) loadAllocations() error {
 	}
 }
 
+func (s *IPAMService) GetInfo(ctx context.Context, in *emptypb.Empty) (*ipamv1.IPAMInfo, error) {
+	return &ipamv1.IPAMInfo{
+		Subnet:       uint32(s.Subnet.Subnet.IP),
+		SubnetPrefix: uint32(s.Subnet.Subnet.Prefix),
+		Gw:           uint32(s.GW),
+	}, nil
+}
 func (s *IPAMService) AllocateIP(ctx context.Context, request *ipamv1.AllocateIPRequest) (*ipamv1.IP, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

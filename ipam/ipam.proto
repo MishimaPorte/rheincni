@@ -15,7 +15,14 @@ message IP {
   fixed32 gw = 2;
 }
 
+message IPAMInfo {
+  fixed32 subnet = 1;
+  fixed32 subnet_prefix = 2;
+  fixed32 gw = 3;
+}
+
 service IPAMService {
+  rpc GetInfo(google.protobuf.Empty) returns (IPAMInfo);
   rpc AllocateIP(AllocateIPRequest) returns (IP);
   rpc DeallocateIP(IP)              returns (google.protobuf.Empty);
 }

@@ -6,9 +6,9 @@ type Interface struct {
 	Sandbox string `json:"sandbox,omitemtpy"`
 }
 type IPConfig struct {
-	Address   IP  `json:"address"`
-	Gateway   IP  `json:"gateway"`
-	Interface int `json:"interface"`
+	Address   IPSubnet `json:"address"`
+	Gateway   IP       `json:"gateway"`
+	Interface int      `json:"interface"`
 }
 type Route struct {
 	Dst IPSubnet `json:"dst"`

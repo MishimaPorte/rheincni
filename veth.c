@@ -11,6 +11,7 @@
 #include <linux/rtnetlink.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 
 #include "lib/types.h"
 #define REQ_SIZE 1024
@@ -52,6 +53,32 @@ int get_errno()
     return errno;
 }
 
+
+int set_interface_up(const char *name)
+{
+    struct ifreq ifr = {0};
+    if (strlen(name) >= IFNAMSIZ)
+        return -1;
+
+    memcpy(ifr.ifr_name, name, strlen(name) + 1);
+
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0)
+        return -1;
+
+    int rc = ioctl(fd, SIOCGIFFLAGS, &ifr);
+    if (rc == 0) {
+        ifr.ifr_flags |= IFF_UP;
+        rc = ioctl(fd, SIOCSIFFLAGS, &ifr);
+    }
+
+    int saved = errno;
+    close(fd);
+    errno = saved;
+    return rc;
+}
+
+
 int create_veth_peer(const char *host_name,
                      const char *peer_name,
                      int netns_fd,
@@ -80,6 +107,7 @@ int create_veth_peer(const char *host_name,
             .nlmsg_seq   = 1,
         },
         .ifi = {
+            .ifi_flags = IFF_UP,
             .ifi_family = AF_UNSPEC,
         },
     };
@@ -186,6 +214,17 @@ int create_veth_peer(const char *host_name,
         return -1;
     }
 
+    int oldns = open("/proc/self/ns/net", O_RDONLY);
+    if (oldns < 0)
+        return -1;
+
+    int rc = syscall(__NR_setns, netns_fd, 0);
+    if (rc < 0)
+        return -1;
+    if (set_interface_up(peer_name)) return -1;
+    rc = syscall(__NR_setns, oldns, 0);
+    if (rc < 0)
+        return -1;
     return 0;
 }
 

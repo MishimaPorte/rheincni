@@ -51,7 +51,7 @@ func Add(e *EnvConfiguration, c *CniConfiguration, x ipamv1.IPAMServiceClient, o
 		Gw:  gw,
 	})
 	out.Ips = append(out.Ips, IPConfig{
-		Address:   IP(allocation.Ip),
+		Address:   IPSubnet{IP: IP(allocation.Ip), Prefix: 32},
 		Gateway:   gw,
 		Interface: 1,
 	})

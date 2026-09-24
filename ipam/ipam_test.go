@@ -73,6 +73,32 @@ func TestIPAMServicePersistsAndRestoresAllocations(t *testing.T) {
 	})
 }
 
+func TestIPAMServiceUsesNodeCIDR(t *testing.T) {
+	database, err := sqlite3.Open(filepath.Join(t.TempDir(), "ipam.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	subnet, err := rheincni.ParseIPSubnet("10.244.2.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewIPAMService(database, subnet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	allocation, err := service.AllocateIP(context.Background(), &ipamv1.AllocateIPRequest{HostEthIndex: 42})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rheincni.IP(allocation.GetGw()).String(); got != "10.244.2.1" {
+		t.Fatalf("gateway = %s; want 10.244.2.1", got)
+	}
+	if got := rheincni.IP(allocation.GetIp()).String(); got != "10.244.2.2" {
+		t.Fatalf("pod IP = %s; want 10.244.2.2", got)
+	}
+}
+
 func TestAllocateRollsBackListWhenInsertFails(t *testing.T) {
 	database, err := sqlite3.Open(filepath.Join(t.TempDir(), "ipam.db"))
 	if err != nil {
