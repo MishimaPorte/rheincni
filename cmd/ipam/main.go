@@ -26,7 +26,7 @@ func main() {
 		log.Fatalf("failed to open IPAM database: %v", err)
 	}
 	defer database.Close()
-	service, err := ipam.NewIPAMService(database, rheincni.IPSubnet{IP: 0, Masc: 8})
+	service, err := ipam.NewIPAMService(database, rheincni.IPSubnet{IP: 0, Prefix: 8})
 	if err != nil {
 		log.Fatalf("failed to initialize IPAM service: %v", err)
 	}

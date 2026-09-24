@@ -49,9 +49,11 @@ func main() {
 
 	switch envConfig.Command {
 	case rheincni.CNICommand_ADD:
-		err = rheincni.Add(&envConfig, &cniConfig, client)
-		ProcessError(err, os.Stderr)
-		os.Exit(1)
+		err = rheincni.Add(&envConfig, &cniConfig, client, &result)
+		if err != nil {
+			ProcessError(err, os.Stderr)
+			os.Exit(1)
+		}
 	case rheincni.CNICommand_DEL:
 		panic("TODO")
 	case rheincni.CNICommand_CHECK:

@@ -16,6 +16,11 @@ import (
 //go:embed db.sql
 var schemaSQL string
 
+const (
+	ownerPod    = "pod"
+	ownerRouter = "router"
+)
+
 type IPRangeNode struct {
 	Next  *IPRangeNode
 	Prev  *IPRangeNode
@@ -193,35 +198,78 @@ func NewIPAMService(db *sqlite3.DB, subnet rheincni.IPSubnet) (*IPAMService, err
 	if err := db.Exec(schemaSQL); err != nil {
 		return nil, fmt.Errorf("initialize IPAM database: %w", err)
 	}
+	if err := migrateOwnerType(db); err != nil {
+		return nil, err
+	}
 
 	service := &IPAMService{
 		DB:     db,
 		Subnet: SubnetAllocation{Subnet: subnet},
 	}
-	gw, ok := service.Subnet.Allocate()
-	if !ok {
-		return nil, fmt.Errorf("could not allocate an address for the gateway")
-	}
-	if gw != service.Subnet.Subnet.Bottom()+1 {
-		return nil, fmt.Errorf("could not allocate a bottom address for the gateway")
-	}
-	service.GW = gw
 	if err := service.loadAllocations(); err != nil {
 		return nil, err
+	}
+	if service.GW == 0 {
+		gw, ok := service.Subnet.Allocate()
+		if !ok {
+			return nil, fmt.Errorf("could not allocate an address for the gateway")
+		}
+		if gw != subnet.Bottom()+1 {
+			service.Subnet.Deallocate(gw)
+			return nil, fmt.Errorf("cannot reserve gateway address %s: it is already allocated to a pod", subnet.Bottom()+1)
+		}
+		if err := service.insertAllocation(gw, 0, ownerRouter); err != nil {
+			service.Subnet.Deallocate(gw)
+			return nil, fmt.Errorf("persist gateway reservation: %w", err)
+		}
+		service.GW = gw
 	}
 	return service, nil
 }
 
+// Existing databases predate owner_type. Their leases all belong to pods.
+func migrateOwnerType(db *sqlite3.DB) error {
+	statement, err := db.Prepare("pragma table_info(ip_allocation)")
+	if err != nil {
+		return fmt.Errorf("inspect IPAM schema: %w", err)
+	}
+	hasOwnerType := false
+	for {
+		hasRow, err := statement.Step()
+		if err != nil {
+			statement.Close()
+			return fmt.Errorf("inspect IPAM schema: %w", err)
+		}
+		if !hasRow {
+			break
+		}
+		if statement.ColumnTextView(1) == "owner_type" {
+			hasOwnerType = true
+		}
+	}
+	if err := statement.Close(); err != nil {
+		return fmt.Errorf("close IPAM schema inspection: %w", err)
+	}
+	if !hasOwnerType {
+		if err := db.Exec("alter table ip_allocation add column owner_type text not null default 'pod' check (owner_type in ('pod', 'router'))"); err != nil {
+			return fmt.Errorf("migrate IPAM owner type: %w", err)
+		}
+	}
+	if err := db.Exec("create unique index if not exists ip_allocation_one_router on ip_allocation(owner_type) where owner_type = 'router'"); err != nil {
+		return fmt.Errorf("ensure unique router reservation: %w", err)
+	}
+	return nil
+}
+
 func (s *IPAMService) loadAllocations() error {
-	statement, err := s.DB.Prepare("select ip from ip_allocation order by ip")
+	statement, err := s.DB.Prepare("select ip, owner_type from ip_allocation order by ip")
 	if err != nil {
 		return fmt.Errorf("prepare allocation restore query: %w", err)
 	}
 	defer statement.Close()
 
 	first := s.Subnet.Subnet.Bottom() + 1
-	top := s.Subnet.Subnet.Top()
-	var tail *IPRangeNode
+	top := s.Subnet.Subnet.Top() - 1
 	for {
 		hasRow, err := statement.Step()
 		if err != nil {
@@ -238,18 +286,19 @@ func (s *IPAMService) loadAllocations() error {
 		if ip < first || ip > top {
 			return fmt.Errorf("restore stored allocation: allocated IP %s is outside subnet %s", ip, s.Subnet.Subnet)
 		}
-		if tail == nil {
-			tail = &IPRangeNode{Start: ip, End: ip}
-			s.Subnet.List = tail
-			continue
+		switch owner := statement.ColumnTextView(1); owner {
+		case ownerRouter:
+			if s.GW != 0 && s.GW != ip {
+				return fmt.Errorf("restore stored allocation: multiple router reservations")
+			}
+			s.GW = ip
+		case ownerPod:
+		default:
+			return fmt.Errorf("restore stored allocation: unknown owner type %q for IP %s", owner, ip)
 		}
-		if ip == tail.End+1 {
-			tail.End = ip
-			continue
+		if err := s.Subnet.AddAllocated(ip); err != nil {
+			return fmt.Errorf("restore stored allocation: %w", err)
 		}
-		next := &IPRangeNode{Prev: tail, Start: ip, End: ip}
-		tail.Next = next
-		tail = next
 	}
 }
 
@@ -268,7 +317,7 @@ func (s *IPAMService) AllocateIP(ctx context.Context, request *ipamv1.AllocateIP
 	if !ok {
 		return nil, fmt.Errorf("out of IPv4 addresses")
 	}
-	if err := s.insertAllocation(newIP, request.GetHostEthIndex()); err != nil {
+	if err := s.insertAllocation(newIP, request.GetHostEthIndex(), ownerPod); err != nil {
 		if !s.Subnet.Deallocate(newIP) {
 			panic("IPAM allocation rollback failed")
 		}
@@ -278,8 +327,8 @@ func (s *IPAMService) AllocateIP(ctx context.Context, request *ipamv1.AllocateIP
 	return &ipamv1.IP{Ip: uint32(newIP), Gw: uint32(s.GW)}, nil
 }
 
-func (s *IPAMService) insertAllocation(ip rheincni.IP, hostEthIndex int32) error {
-	statement, err := s.DB.Prepare("insert into ip_allocation (ip, veth_index) values (?, ?)")
+func (s *IPAMService) insertAllocation(ip rheincni.IP, hostEthIndex int32, ownerType string) error {
+	statement, err := s.DB.Prepare("insert into ip_allocation (ip, veth_index, owner_type) values (?, ?, ?)")
 	if err != nil {
 		return fmt.Errorf("prepare allocation insert: %w", err)
 	}
@@ -290,6 +339,9 @@ func (s *IPAMService) insertAllocation(ip rheincni.IP, hostEthIndex int32) error
 	}
 	if err := statement.BindInt64(2, int64(hostEthIndex)); err != nil {
 		return fmt.Errorf("bind host interface index: %w", err)
+	}
+	if err := statement.BindText(3, ownerType); err != nil {
+		return fmt.Errorf("bind allocation owner: %w", err)
 	}
 	if _, err := statement.Step(); err != nil {
 		return fmt.Errorf("insert allocation for IP %s: %w", ip, err)
@@ -309,6 +361,9 @@ func (s *IPAMService) DeallocateIP(ctx context.Context, request *ipamv1.IP) (*em
 	defer s.mu.Unlock()
 
 	ip := rheincni.IP(request.Ip)
+	if ip == s.GW {
+		return nil, fmt.Errorf("cannot deallocate router address %s", ip)
+	}
 	if !s.Subnet.Deallocate(ip) {
 		return &emptypb.Empty{}, nil
 	}
@@ -323,7 +378,7 @@ func (s *IPAMService) DeallocateIP(ctx context.Context, request *ipamv1.IP) (*em
 }
 
 func (s *IPAMService) deleteAllocation(ip rheincni.IP) error {
-	statement, err := s.DB.Prepare("delete from ip_allocation where ip = ?")
+	statement, err := s.DB.Prepare("delete from ip_allocation where ip = ? and owner_type = 'pod'")
 	if err != nil {
 		return fmt.Errorf("prepare allocation delete: %w", err)
 	}
