@@ -11,7 +11,8 @@ message AllocateIPRequest {
 }
 
 message IP {
-  sfixed32 ip = 1;
+  fixed32 ip = 1;
+  fixed32 gw = 2;
 }
 
 service IPAMService {

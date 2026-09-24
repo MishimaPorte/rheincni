@@ -5,19 +5,19 @@ type Interface struct {
 	Mac     Mac    `json:"mac"`
 	Sandbox string `json:"sandbox,omitemtpy"`
 }
-type Ip struct {
-	Address   string `json:"address"`
-	Gateway   string `json:"gateway"`
-	Interface int    `json:"interface"`
+type IPConfig struct {
+	Address   IP  `json:"address"`
+	Gateway   IP  `json:"gateway"`
+	Interface int `json:"interface"`
 }
 type Route struct {
-	Dst string `json:"dst"`
-	Gw  string `json:"gw"`
+	Dst IPSubnet `json:"dst"`
+	Gw  IP       `json:"gw"`
 }
 
 type Result struct {
 	CniVersion string
 	Interfaces []Interface
-	Ips        []Ip
+	Ips        []IPConfig
 	Routes     []Route
 }

@@ -68,7 +68,8 @@ func (x *AllocateIPRequest) GetHostEthIndex() int32 {
 
 type IP struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ip            int32                  `protobuf:"fixed32,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	Ip            uint32                 `protobuf:"fixed32,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	Gw            uint32                 `protobuf:"fixed32,2,opt,name=gw,proto3" json:"gw,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -103,9 +104,16 @@ func (*IP) Descriptor() ([]byte, []int) {
 	return file_ipam_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *IP) GetIp() int32 {
+func (x *IP) GetIp() uint32 {
 	if x != nil {
 		return x.Ip
+	}
+	return 0
+}
+
+func (x *IP) GetGw() uint32 {
+	if x != nil {
+		return x.Gw
 	}
 	return 0
 }
@@ -117,9 +125,10 @@ const file_ipam_proto_rawDesc = "" +
 	"\n" +
 	"ipam.proto\x12\aipam.v1\x1a\x1bgoogle/protobuf/empty.proto\"9\n" +
 	"\x11AllocateIPRequest\x12$\n" +
-	"\x0ehost_eth_index\x18\x01 \x01(\x0fR\fhostEthIndex\"\x14\n" +
+	"\x0ehost_eth_index\x18\x01 \x01(\x0fR\fhostEthIndex\"$\n" +
 	"\x02IP\x12\x0e\n" +
-	"\x02ip\x18\x01 \x01(\x0fR\x02ip2y\n" +
+	"\x02ip\x18\x01 \x01(\aR\x02ip\x12\x0e\n" +
+	"\x02gw\x18\x02 \x01(\aR\x02gw2y\n" +
 	"\vIPAMService\x125\n" +
 	"\n" +
 	"AllocateIP\x12\x1a.ipam.v1.AllocateIPRequest\x1a\v.ipam.v1.IP\x123\n" +

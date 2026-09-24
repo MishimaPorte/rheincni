@@ -5,7 +5,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"rheincni"
+	"rheincni/ipam"
 	"rheincni/ipam/gen/ipamv1"
+	sqlite3 "rheincni/thirdparty/sqlite/bindings"
 	"syscall"
 
 	"google.golang.org/grpc"
@@ -18,15 +21,26 @@ func main() {
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
-	thing.RegisterMyServiceServer(grpcServer, new(ThingService{}))
+	database, err := sqlite3.Open("/var/lib/rheincni/ipam.db")
+	if err != nil {
+		log.Fatalf("failed to open IPAM database: %v", err)
+	}
+	defer database.Close()
+	service, err := ipam.NewIPAMService(database, rheincni.IPSubnet{IP: 0, Masc: 8})
+	if err != nil {
+		log.Fatalf("failed to initialize IPAM service: %v", err)
+	}
+	ipamv1.RegisterIPAMServiceServer(grpcServer, service)
 
-	ipamv1.RegisterIPAMServiceServer(grpcServer, opts)
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-signals
-		os.Exit(0)
+		err = grpcServer.Serve(lis)
+		if err != nil {
+			panic(err.Error())
+		}
 	}()
 
-	select {}
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	<-signals
+	grpcServer.GracefulStop()
 }

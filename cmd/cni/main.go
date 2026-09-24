@@ -8,6 +8,10 @@ import (
 	"io"
 	"os"
 	"rheincni"
+	"rheincni/ipam/gen/ipamv1"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var envConfig rheincni.EnvConfiguration
@@ -30,12 +34,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	grpcCli, err := grpc.NewClient(
+		"127.0.0.1:8080",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		ProcessError(err, os.Stderr)
+		os.Exit(1)
+	}
+	client := ipamv1.NewIPAMServiceClient(grpcCli)
+
 	var result rheincni.Result
 	result.CniVersion = "1.0.0"
 
 	switch envConfig.Command {
 	case rheincni.CNICommand_ADD:
-		err = rheincni.Add(&envConfig, &cniConfig)
+		err = rheincni.Add(&envConfig, &cniConfig, client)
 		ProcessError(err, os.Stderr)
 		os.Exit(1)
 	case rheincni.CNICommand_DEL:
