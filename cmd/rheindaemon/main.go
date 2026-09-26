@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"rheincni/ipam"
 	"rheincni/ipam/gen/ipamv1"
+	routerservice "rheincni/router_service"
+	"rheincni/router_service/gen/routerservicev1"
 	sqlite3 "rheincni/thirdparty/sqlite/bindings"
 	"syscall"
 	"time"
@@ -39,10 +41,6 @@ func main() {
 		log.Fatalf("failed to open IPAM database: %v", err)
 	}
 	defer database.Close()
-	service, err := ipam.NewIPAMService(database, subnet)
-	if err != nil {
-		log.Fatalf("failed to initialize IPAM service: %v", err)
-	}
 
 	lis, err := net.Listen("tcp", "localhost:8080")
 	if err != nil {
@@ -50,7 +48,18 @@ func main() {
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
-	ipamv1.RegisterIPAMServiceServer(grpcServer, service)
+
+	ipamService, err := ipam.NewIPAMService(database, subnet)
+	if err != nil {
+		log.Fatalf("failed to initialize IPAM service: %v", err)
+	}
+	ipamv1.RegisterIPAMServiceServer(grpcServer, ipamService)
+
+	routerService, err := routerservice.NewRouterService([]byte{}, "endpoints")
+	if err != nil {
+		log.Fatalf("failed to initialize IPAM service: %v", err)
+	}
+	routerservicev1.RegisterRouterServiceServer(grpcServer, routerService)
 
 	go func() {
 		err = grpcServer.Serve(lis)

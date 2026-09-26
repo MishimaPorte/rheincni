@@ -1,3 +1,6 @@
+#if !defined(VETH_H)
+#define VETH_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -18,3 +21,4 @@ int create_veth_peer(const char *host_name,
                      mac *host_mac,
                      mac *peer_mac);
 int get_errno();
+#endif

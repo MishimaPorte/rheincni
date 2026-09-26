@@ -1,3 +1,6 @@
+#if !defined(LIBTYPES_H)
+#define LIBTYPES_H
+
 #include <stdint.h>
 
 typedef uint8_t  u8;
@@ -50,3 +53,5 @@ typedef struct {
     ip   saddr;
     ip   daddr;
 } __attribute__((packed)) ip_hdr;
+
+#endif

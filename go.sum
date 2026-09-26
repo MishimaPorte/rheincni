@@ -1,5 +1,9 @@
 github.com/MishimaPorte/ebpf-loader v0.0.0-20260920165731-eda8bb19775a h1:HCukBz6t1ZFu6eb3N4w2R8mxiNF8tAHpUlG+wGXfc8g=
 github.com/MishimaPorte/ebpf-loader v0.0.0-20260920165731-eda8bb19775a/go.mod h1:IVkLlOB5WHxDMNT27xJLji02KmIplxxXTPoQ5AGp5ag=
+github.com/MishimaPorte/ebpf-loader v0.0.0-20260926194338-901d65f68148 h1:PpapyXpM6Vdk07/61TZtV6FBMJGCp7p9iWhNJcFtzB0=
+github.com/MishimaPorte/ebpf-loader v0.0.0-20260926194338-901d65f68148/go.mod h1:IVkLlOB5WHxDMNT27xJLji02KmIplxxXTPoQ5AGp5ag=
+github.com/MishimaPorte/ebpf-loader v0.0.0-20260926194746-6e75ede0dc94 h1:X89DbPArpfzOS7POFfS4/ggHOGyf6Xdg6ZzuEhkEr+o=
+github.com/MishimaPorte/ebpf-loader v0.0.0-20260926194746-6e75ede0dc94/go.mod h1:IVkLlOB5WHxDMNT27xJLji02KmIplxxXTPoQ5AGp5ag=
 github.com/bytedance/gopkg v0.1.3 h1:TPBSwH8RsouGCBcMBktLt1AymVo2TVsBVCY4b6TnZ/M=
 github.com/bytedance/gopkg v0.1.3/go.mod h1:576VvJ+eJgyCzdjS+c4+77QF3p7ubbtiKARP3TxducM=
 github.com/bytedance/sonic v1.15.4 h1:FgtV/4aBHpla9AxuMpuuzVUpa/Cf3izufkxNmnEzdI8=

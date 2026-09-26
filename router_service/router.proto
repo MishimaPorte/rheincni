@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package ipam.v1;
+
+option go_package = "rheincni/router_service/gen/routerservicev1;routerservicev1";
+
+import "google/protobuf/empty.proto";
+
+message AddVethPairReq {
+  string netns = 1;
+  string peer_eth_name = 2;
+  string host_eth_name = 3;
+}
+
+message AddVethPairResp {
+  fixed64 host_mac = 1;
+  fixed64 peer_mac = 2;
+  fixed32 host_idx = 3;
+}
+
+message AddRouteReq {
+  fixed32 target_ip      = 1;
+  fixed32 target_ifindex = 2;
+  fixed64 target_mac     = 3;
+}
+
+message RemoveRouteReq {
+  fixed32 target_ip = 1;
+}
+
+message RouterInfo {
+  int32 number_of_routes = 1;
+}
+
+service RouterService {
+  rpc GetInfo(google.protobuf.Empty)  returns (RouterInfo);
+  rpc AddVethPair(AddVethPairReq)     returns (AddVethPairResp);
+  rpc AddRoute(AddRouteReq)           returns (google.protobuf.Empty);
+  rpc RemoveRoute(RemoveRouteReq)     returns (google.protobuf.Empty);
+}

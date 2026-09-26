@@ -7,10 +7,10 @@ kind_config="$config_dir/kind.yaml"
 cni_config="$config_dir/10-rheincni.conf"
 kubeconfig="$config_dir/kubeconfig"
 plugin_binary="$config_dir/bin/rheincni"
-ipam_binary="$config_dir/bin/rheincni-ipam"
-ipam_image="rheincni-ipam:dev"
-ipam_dockerfile="$repo_dir/deploy/ipam-agent.Dockerfile"
-ipam_manifest="$repo_dir/deploy/ipam-agent.yaml"
+daemon_binary="$config_dir/bin/rheindaemon"
+daemon_image="rheindaemon:dev"
+daemon_dockerfile="$repo_dir/deploy/rheindaemon.Dockerfile"
+daemon_manifest="$repo_dir/deploy/rheindaemon.yaml"
 cluster_name="${KIND_CLUSTER_NAME:-rheincni}"
 action="${1:-up}"
 
@@ -64,19 +64,19 @@ printf 'Building rheincni for linux/%s...\n' "$node_arch"
     -o "$plugin_binary" ./cmd/cni
 )
 
-printf 'Building rheincni IPAM agent for linux/%s...\n' "$node_arch"
+printf 'Building rheindaemon for linux/%s...\n' "$node_arch"
 (
   cd "$repo_dir"
   GOOS=linux GOARCH="$node_arch" CGO_ENABLED=1 \
     go build -tags netgo,osusergo -trimpath -ldflags='-linkmode external -extldflags -static' \
-    -o "$ipam_binary" ./cmd/ipam
+    -o "$daemon_binary" ./cmd/rheindaemon
 )
 
-printf 'Building %s...\n' "$ipam_image"
+printf 'Building %s...\n' "$daemon_image"
 docker build \
   --platform "linux/$node_arch" \
-  --file "$ipam_dockerfile" \
-  --tag "$ipam_image" \
+  --file "$daemon_dockerfile" \
+  --tag "$daemon_image" \
   "$config_dir/bin"
 
 if [[ ! -e "$kind_config" ]]; then
@@ -129,16 +129,16 @@ for node in $nodes; do
   '
 done
 
-printf 'Loading %s into kind cluster %s...\n' "$ipam_image" "$cluster_name"
-kind load docker-image --name "$cluster_name" "$ipam_image"
+printf 'Loading %s into kind cluster %s...\n' "$daemon_image" "$cluster_name"
+kind load docker-image --name "$cluster_name" "$daemon_image"
 
-printf 'Applying rheincni IPAM agent manifests...\n'
+printf 'Applying rheindaemon manifests...\n'
 kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" \
-  apply -f "$ipam_manifest"
+  apply -f "$daemon_manifest"
 kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" \
-  rollout restart daemonset/rheincni-ipam --namespace kube-system
+  rollout restart daemonset/rheindaemon --namespace kube-system
 kubectl --kubeconfig "$kubeconfig" --context "kind-$cluster_name" \
-  rollout status daemonset/rheincni-ipam --namespace kube-system --timeout=120s
+  rollout status daemonset/rheindaemon --namespace kube-system --timeout=120s
 
 for node in $nodes; do
   printf 'Installing rheincni on %s...\n' "$node"
