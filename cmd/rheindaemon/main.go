@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"rheincni/ebpf"
 	"rheincni/ipam"
 	"rheincni/ipam/gen/ipamv1"
 	routerservice "rheincni/router_service"
@@ -55,7 +56,7 @@ func main() {
 	}
 	ipamv1.RegisterIPAMServiceServer(grpcServer, ipamService)
 
-	routerService, err := routerservice.NewRouterService([]byte{}, "endpoints")
+	routerService, err := routerservice.NewRouterService(ebpf.RouterProgram, "endpoints")
 	if err != nil {
 		log.Fatalf("failed to initialize IPAM service: %v", err)
 	}

@@ -168,34 +168,6 @@ int create_veth_peer(const char *host_name,
     char msg[1024 * 1024];
 
     ssize_t received = recv(fd, &msg, sizeof msg, 0);
-    // struct nlmsghdr *recv_h = (struct nlmsghdr *)&msg[received];
-    // received += rx;
-    // if (received >= recv_h->nlmsg_len) {
-    //     printf("first packet received: %zu -> %zu\n", received, recv_h->nlmsg_len);
-    //     if (recv_h->nlmsg_type == NLMSG_ERROR) {
-    //         printf("type: %zu\n", recv_h->nlmsg_type);
-    //         struct nlmsgerr *error = (void*)(recv_h + 1);
-    //         errno = -error->error;
-    //         return -1;
-    //     }
-    //
-    //     if (recv_h->nlmsg_type != RTM_NEWLINK) {
-    //         errno = EPROTO;
-    //         return -1;
-    //     }
-    //     struct nlmsghdr *recv_h2 = (struct nlmsghdr *)&msg[recv_h->nlmsg_len];
-    //     if (received < recv_h->nlmsg_len + recv_h2->nlmsg_len)
-    //         while (received < recv_h->nlmsg_len + recv_h2->nlmsg_len)
-    //             received += recv(fd, &msg[received], sizeof msg - received, 0);
-    //
-    // } else {
-    //     while (received < recv_h->nlmsg_len)
-    //         received += recv(fd, &msg[received], sizeof msg - received, 0);
-    //     struct nlmsghdr *recv_h2 = (struct nlmsghdr *)&msg[recv_h->nlmsg_len];
-    //     if (received <= recv_h->nlmsg_len + recv_h2->nlmsg_len)
-    //         while (received < recv_h->nlmsg_len + recv_h2->nlmsg_len)
-    //             received += recv(fd, &msg[received], sizeof msg - received, 0);
-    // }
     if (!received) {
         int saved = errno;
         close(fd);
@@ -227,4 +199,3 @@ int create_veth_peer(const char *host_name,
         return -1;
     return 0;
 }
-

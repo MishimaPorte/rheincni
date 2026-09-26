@@ -12,7 +12,7 @@ require (
 )
 
 require (
-	github.com/MishimaPorte/ebpf-loader v0.0.0-20260926194746-6e75ede0dc94 // indirect
+	github.com/MishimaPorte/ebpf-loader v0.0.0-20260926201846-ca3fe5cf9f76 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic/loader v0.5.2 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect

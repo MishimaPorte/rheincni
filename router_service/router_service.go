@@ -25,7 +25,9 @@ type RouterService struct {
 }
 
 func (r *RouterService) GetInfo(ctx context.Context, in *emptypb.Empty) (*rsv1.RouterInfo, error) {
-	return new(rsv1.RouterInfo), nil
+	return &rsv1.RouterInfo{
+		NumberOfRoutes: 0,
+	}, nil
 }
 
 func (r *RouterService) AddRoute(ctx context.Context, in *rsv1.AddRouteReq) (*emptypb.Empty, error) {
@@ -51,7 +53,7 @@ func (r *RouterService) AddVethPair(ctx context.Context, in *rsv1.AddVethPairReq
 	if err != nil {
 		return nil, fmt.Errorf("create veth peer veth: %w", err)
 	}
-	linkFd, err := loader.AttachProgramToInterface(r.ProgramFd, in.HostEthName)
+	linkFd, err := loader.AttachProgramToInterface(r.ProgramFd, in.HostEthName, C.BPF_XDP)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +75,7 @@ func NewRouterService(routerProgramElf []byte, routerMapName string) (*RouterSer
 		return nil, err
 	}
 
-	programFd, err := loader.LoadProgram("GPL", routerProgramElf,
+	programFd, err := loader.LoadProgram("GPL", routerProgramElf, C.BPF_PROG_TYPE_XDP,
 		loader.OverrideMap(routerMapName, int(mapfd)))
 	if err != nil {
 		return nil, err
