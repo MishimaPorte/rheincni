@@ -21,4 +21,16 @@ int create_veth_peer(const char *host_name,
                      mac *host_mac,
                      mac *peer_mac);
 int get_errno();
+
+int veth_netlink_newroute(int netlink_fd,
+                          int ifindex,
+                          int rtm_scope,
+                          int rtm_table,
+                          char rtm_dst_len,
+                          u32 pod_ip,
+                          u32 gateway_ip);
+
+int veth_netlink_newaddr(int netlink_fd,
+                         int ifindex,
+                         u32 pod_ip);
 #endif

@@ -5,10 +5,10 @@ import (
 )
 import (
 	"encoding/json"
-	"io"
 	"os"
 	"rheincni"
 	"rheincni/ipam/gen/ipamv1"
+	rsv1 "rheincni/router_service/gen/routerservicev1"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -17,20 +17,16 @@ import (
 var envConfig rheincni.EnvConfiguration
 var cniConfig rheincni.CniConfiguration
 
-func ProcessError(err error, out io.Writer) {
-
-}
-
 func main() {
 	err := rheincni.ParseEnv(&envConfig)
 	if err != nil {
-		ProcessError(err, os.Stderr)
+		rheincni.ProcessError(err, "1.0.0", nil, os.Stderr)
 		os.Exit(1)
 	}
 
 	err = rheincni.ParseJsonInput(os.Stdin, &cniConfig)
 	if err != nil {
-		ProcessError(err, os.Stderr)
+		rheincni.ProcessError(err, "1.0.0", nil, os.Stderr)
 		os.Exit(1)
 	}
 
@@ -39,19 +35,20 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		ProcessError(err, os.Stderr)
+		rheincni.ProcessError(err, cniConfig.CniVersion, nil, os.Stderr)
 		os.Exit(1)
 	}
-	client := ipamv1.NewIPAMServiceClient(grpcCli)
+	ipamCli := ipamv1.NewIPAMServiceClient(grpcCli)
+	rsCli := rsv1.NewRouterServiceClient(grpcCli)
 
 	var result rheincni.Result
 	result.CniVersion = "1.0.0"
 
 	switch envConfig.Command {
 	case rheincni.CNICommand_ADD:
-		err = rheincni.Add(&envConfig, &cniConfig, client, &result)
+		err = rheincni.Add(&envConfig, &cniConfig, ipamCli, rsCli, &result)
 		if err != nil {
-			ProcessError(err, os.Stderr)
+			rheincni.ProcessError(err, cniConfig.CniVersion, nil, os.Stderr)
 			os.Exit(1)
 		}
 	case rheincni.CNICommand_DEL:
@@ -66,7 +63,7 @@ func main() {
 
 	err = json.NewEncoder(os.Stdout).Encode(&result)
 	if err != nil {
-		ProcessError(err, os.Stderr)
+		rheincni.ProcessError(err, cniConfig.CniVersion, nil, os.Stderr)
 		os.Exit(1)
 	}
 }

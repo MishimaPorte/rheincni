@@ -218,7 +218,7 @@ func NewIPAMService(db *sqlite3.DB, subnet rheincni.IPSubnet) (*IPAMService, err
 			service.Subnet.Deallocate(gw)
 			return nil, fmt.Errorf("cannot reserve gateway address %s: it is already allocated to a pod", subnet.Bottom()+1)
 		}
-		if err := service.insertAllocation(gw, 0, ownerRouter); err != nil {
+		if err := service.insertAllocation(gw, 0, ownerRouter, false, 0, "", 0); err != nil {
 			service.Subnet.Deallocate(gw)
 			return nil, fmt.Errorf("persist gateway reservation: %w", err)
 		}
@@ -324,7 +324,11 @@ func (s *IPAMService) AllocateIP(ctx context.Context, request *ipamv1.AllocateIP
 	if !ok {
 		return nil, fmt.Errorf("out of IPv4 addresses")
 	}
-	if err := s.insertAllocation(newIP, request.GetHostEthIndex(), ownerPod); err != nil {
+	if err := s.insertAllocation(
+		newIP, request.HostEthIndex, ownerPod,
+		true,
+		request.PeerEthIndex, request.Netns, s.GW,
+	); err != nil {
 		if !s.Subnet.Deallocate(newIP) {
 			panic("IPAM allocation rollback failed")
 		}
@@ -334,7 +338,11 @@ func (s *IPAMService) AllocateIP(ctx context.Context, request *ipamv1.AllocateIP
 	return &ipamv1.IP{Ip: uint32(newIP), Gw: uint32(s.GW)}, nil
 }
 
-func (s *IPAMService) insertAllocation(ip rheincni.IP, hostEthIndex int32, ownerType string) error {
+func (s *IPAMService) insertAllocation(
+	ip rheincni.IP, hostEthIndex int32, ownerType string,
+	needRoute bool,
+	podIfIndex int32, netns string, gwIp rheincni.IP,
+) error {
 	statement, err := s.DB.Prepare("insert into ip_allocation (ip, veth_index, owner_type) values (?, ?, ?)")
 	if err != nil {
 		return fmt.Errorf("prepare allocation insert: %w", err)
@@ -349,6 +357,12 @@ func (s *IPAMService) insertAllocation(ip rheincni.IP, hostEthIndex int32, owner
 	}
 	if err := statement.BindText(3, ownerType); err != nil {
 		return fmt.Errorf("bind allocation owner: %w", err)
+	}
+	if needRoute {
+		err = rheincni.SetupPodIPRouting(int(hostEthIndex), int(podIfIndex), ip, gwIp, netns)
+		if err != nil {
+			return err
+		}
 	}
 	if _, err := statement.Step(); err != nil {
 		return fmt.Errorf("insert allocation for IP %s: %w", ip, err)

@@ -25,6 +25,8 @@ const (
 type AllocateIPRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	HostEthIndex  int32                  `protobuf:"fixed32,1,opt,name=host_eth_index,json=hostEthIndex,proto3" json:"host_eth_index,omitempty"`
+	PeerEthIndex  int32                  `protobuf:"fixed32,2,opt,name=peer_eth_index,json=peerEthIndex,proto3" json:"peer_eth_index,omitempty"`
+	Netns         string                 `protobuf:"bytes,3,opt,name=netns,proto3" json:"netns,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -64,6 +66,20 @@ func (x *AllocateIPRequest) GetHostEthIndex() int32 {
 		return x.HostEthIndex
 	}
 	return 0
+}
+
+func (x *AllocateIPRequest) GetPeerEthIndex() int32 {
+	if x != nil {
+		return x.PeerEthIndex
+	}
+	return 0
+}
+
+func (x *AllocateIPRequest) GetNetns() string {
+	if x != nil {
+		return x.Netns
+	}
+	return ""
 }
 
 type IP struct {
@@ -183,9 +199,11 @@ var File_ipam_proto protoreflect.FileDescriptor
 const file_ipam_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"ipam.proto\x12\aipam.v1\x1a\x1bgoogle/protobuf/empty.proto\"9\n" +
+	"ipam.proto\x12\aipam.v1\x1a\x1bgoogle/protobuf/empty.proto\"u\n" +
 	"\x11AllocateIPRequest\x12$\n" +
-	"\x0ehost_eth_index\x18\x01 \x01(\x0fR\fhostEthIndex\"$\n" +
+	"\x0ehost_eth_index\x18\x01 \x01(\x0fR\fhostEthIndex\x12$\n" +
+	"\x0epeer_eth_index\x18\x02 \x01(\x0fR\fpeerEthIndex\x12\x14\n" +
+	"\x05netns\x18\x03 \x01(\tR\x05netns\"$\n" +
 	"\x02IP\x12\x0e\n" +
 	"\x02ip\x18\x01 \x01(\aR\x02ip\x12\x0e\n" +
 	"\x02gw\x18\x02 \x01(\aR\x02gw\"W\n" +

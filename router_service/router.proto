@@ -16,6 +16,7 @@ message AddVethPairResp {
   fixed64 host_mac = 1;
   fixed64 peer_mac = 2;
   fixed32 host_idx = 3;
+  fixed32 peer_idx = 4;
 }
 
 message AddRouteReq {

@@ -15,6 +15,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/netip"
+	"runtime"
+
+	"golang.org/x/sys/unix"
 )
 
 type Mac [6]byte
@@ -25,6 +28,17 @@ func (m Mac) String() string {
 		m[0], m[1], m[2],
 		m[3], m[4], m[5],
 	)
+}
+func MacFromUint64(u uint64) Mac {
+	var bts [8]byte
+	binary.BigEndian.PutUint64(bts[:], u)
+	return Mac(bts[:6])
+}
+
+func MacToUint64(m Mac) uint64 {
+	var b [8]byte
+	copy(b[:6], m[:])
+	return binary.BigEndian.Uint64(b[:])
 }
 
 type MacPair [2]Mac
@@ -87,7 +101,7 @@ func GenerateRandomMacPair(out *MacPair) {
 
 }
 
-func CreateVethPeer(hostEth string, peerVeth string, netns string, mp MacPair) (err error) {
+func CreateVethPeer(hostEth string, peerVeth string, netns string, mp MacPair) (peerIdx int, err error) {
 	cstrHostVeth := C.CString(hostEth)
 	cstrPeerVeth := C.CString(peerVeth)
 
@@ -96,10 +110,105 @@ func CreateVethPeer(hostEth string, peerVeth string, netns string, mp MacPair) (
 
 	netnsFd, err := syscall.Open(netns, syscall.O_RDONLY, 0)
 	if err != nil && err.(syscall.Errno) != 0 {
-		return err
+		return 0, err
+	}
+	defer unix.Close(netnsFd)
+
+	idx := C.create_veth_peer(cstrHostVeth, cstrPeerVeth, C.int(netnsFd), (*C.mac)(unsafe.Pointer(&mp[0])), (*C.mac)(unsafe.Pointer(&mp[1])))
+	if idx == -1 {
+		return 0, syscall.Errno(C.get_errno())
 	}
 
-	if C.create_veth_peer(cstrHostVeth, cstrPeerVeth, C.int(netnsFd), (*C.mac)(unsafe.Pointer(&mp[0])), (*C.mac)(unsafe.Pointer(&mp[1]))) == -1 {
+	return int(idx), nil
+}
+
+func SetupPodIPRouting(ifindex int, podIfIndex int, podIp IP, gwIp IP, netns string) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	sock, err := unix.Socket(
+		unix.AF_NETLINK,
+		unix.SOCK_RAW,
+		unix.NETLINK_ROUTE,
+	)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(sock)
+
+	isErr := C.veth_netlink_newroute(
+		C.int(sock),
+		C.int(ifindex),
+		C.RT_SCOPE_LINK,
+		C.RT_TABLE_MAIN,
+		32,
+		C.uint32_t(podIp),
+		0)
+	if isErr == -1 {
+		return syscall.Errno(C.get_errno())
+	}
+
+	netnsFd, err := unix.Open(netns, unix.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(netnsFd)
+
+	oldNs, err := unix.Open("/proc/self/ns/net", unix.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(oldNs)
+
+	_, _, errno := syscall.Syscall(unix.SYS_SETNS, uintptr(netnsFd), 0, 0)
+	if errno != 0 {
+		return errno
+	}
+	defer func() {
+		_, _, errno := syscall.Syscall(unix.SYS_SETNS, uintptr(oldNs), 0, 0)
+		if errno != 0 {
+			panic("could not restore netns: " + errno.Error())
+		}
+	}()
+
+	podSock, err := unix.Socket(
+		unix.AF_NETLINK,
+		unix.SOCK_RAW,
+		unix.NETLINK_ROUTE,
+	)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(podSock)
+
+	isErr = C.veth_netlink_newaddr(
+		C.int(podSock),
+		C.int(podIfIndex),
+		C.uint32_t(podIp))
+	if isErr == -1 {
+		return syscall.Errno(C.get_errno())
+	}
+
+	isErr = C.veth_netlink_newroute(
+		C.int(podSock),
+		C.int(podIfIndex),
+		C.RT_SCOPE_LINK,
+		C.RT_TABLE_MAIN,
+		32,
+		C.uint32_t(gwIp),
+		0)
+	if isErr == -1 {
+		return syscall.Errno(C.get_errno())
+	}
+	isErr = C.veth_netlink_newroute(
+		C.int(podSock),
+		C.int(podIfIndex),
+		C.RT_SCOPE_UNIVERSE,
+		C.RT_TABLE_MAIN,
+		0,
+		0,
+		C.uint32_t(gwIp))
+	if isErr == -1 {
 		return syscall.Errno(C.get_errno())
 	}
 

@@ -8,6 +8,8 @@ import "google/protobuf/empty.proto";
 
 message AllocateIPRequest {
   sfixed32 host_eth_index = 1;
+  sfixed32 peer_eth_index = 2;
+  string   netns          = 3;
 }
 
 message IP {

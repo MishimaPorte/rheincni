@@ -22,14 +22,17 @@ func CreateEndpointMap() (MapFd, error) {
 	return 0, fmt.Errorf("map creation error: %w", syscall.Errno(C.get_errno()))
 }
 
-func UpdateEndpoint(mapFd MapFd, ip uint32, mac uint64, ifindex int) error {
+func UpdateEndpoint(mapFd MapFd, ip [4]byte, mac uint64, ifindex int) error {
 	endpoint := C.endpoint{
 		ifindex: C.int(ifindex),
 	}
-	binary.BigEndian.PutUint64(unsafe.Slice(
+	var macBytes [8]byte
+	binary.BigEndian.PutUint64(macBytes[:], mac)
+	copy(unsafe.Slice(
 		(*byte)(unsafe.Pointer(&endpoint.mac[0])),
 		C.sizeof_mac,
-	), mac)
+	), macBytes[:6])
+
 	err := C.bpf_update_map(C.int(mapFd), unsafe.Pointer(&ip), unsafe.Pointer(&endpoint))
 	if err != 0 {
 		return syscall.Errno(err)
@@ -37,7 +40,7 @@ func UpdateEndpoint(mapFd MapFd, ip uint32, mac uint64, ifindex int) error {
 	return nil
 }
 
-func DeleteEndpoint(mapFd MapFd, ip uint32) error {
+func DeleteEndpoint(mapFd MapFd, ip [4]byte) error {
 	err := C.bpf_delete_map_element(C.int(mapFd), unsafe.Pointer(&ip))
 	if err != 0 {
 		return syscall.Errno(err)

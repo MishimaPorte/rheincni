@@ -87,6 +87,7 @@ type AddVethPairResp struct {
 	HostMac       uint64                 `protobuf:"fixed64,1,opt,name=host_mac,json=hostMac,proto3" json:"host_mac,omitempty"`
 	PeerMac       uint64                 `protobuf:"fixed64,2,opt,name=peer_mac,json=peerMac,proto3" json:"peer_mac,omitempty"`
 	HostIdx       uint32                 `protobuf:"fixed32,3,opt,name=host_idx,json=hostIdx,proto3" json:"host_idx,omitempty"`
+	PeerIdx       uint32                 `protobuf:"fixed32,4,opt,name=peer_idx,json=peerIdx,proto3" json:"peer_idx,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -138,6 +139,13 @@ func (x *AddVethPairResp) GetPeerMac() uint64 {
 func (x *AddVethPairResp) GetHostIdx() uint32 {
 	if x != nil {
 		return x.HostIdx
+	}
+	return 0
+}
+
+func (x *AddVethPairResp) GetPeerIdx() uint32 {
+	if x != nil {
+		return x.PeerIdx
 	}
 	return 0
 }
@@ -298,11 +306,12 @@ const file_router_proto_rawDesc = "" +
 	"\x0eAddVethPairReq\x12\x14\n" +
 	"\x05netns\x18\x01 \x01(\tR\x05netns\x12\"\n" +
 	"\rpeer_eth_name\x18\x02 \x01(\tR\vpeerEthName\x12\"\n" +
-	"\rhost_eth_name\x18\x03 \x01(\tR\vhostEthName\"b\n" +
+	"\rhost_eth_name\x18\x03 \x01(\tR\vhostEthName\"}\n" +
 	"\x0fAddVethPairResp\x12\x19\n" +
 	"\bhost_mac\x18\x01 \x01(\x06R\ahostMac\x12\x19\n" +
 	"\bpeer_mac\x18\x02 \x01(\x06R\apeerMac\x12\x19\n" +
-	"\bhost_idx\x18\x03 \x01(\aR\ahostIdx\"p\n" +
+	"\bhost_idx\x18\x03 \x01(\aR\ahostIdx\x12\x19\n" +
+	"\bpeer_idx\x18\x04 \x01(\aR\apeerIdx\"p\n" +
 	"\vAddRouteReq\x12\x1b\n" +
 	"\ttarget_ip\x18\x01 \x01(\aR\btargetIp\x12%\n" +
 	"\x0etarget_ifindex\x18\x02 \x01(\aR\rtargetIfindex\x12\x1d\n" +

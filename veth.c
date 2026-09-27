@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 #include <linux/veth.h>
 #include <linux/rtnetlink.h>
 #include <sys/ioctl.h>
@@ -168,9 +169,124 @@ int create_veth_peer(const char *host_name,
     char msg[1024 * 1024];
 
     ssize_t received = recv(fd, &msg, sizeof msg, 0);
-    if (!received) {
+    if (!received || received < 0) {
         int saved = errno;
         close(fd);
+        errno = saved;
+        return -1;
+    }
+
+    struct nlmsghdr *h = (struct nlmsghdr *)&msg[0];
+    if (h->nlmsg_type != NLMSG_ERROR) {
+        close(fd);
+        errno = EPROTO;
+        return -1;
+    }
+    struct nlmsgerr *error = (void*)(h + 1);
+    if (error->error) {
+        close(fd);
+        errno = -error->error;
+        return -1;
+    }
+    close(fd);
+
+    int oldns = open("/proc/self/ns/net", O_RDONLY);
+    if (oldns < 0)
+        return -1;
+
+    int rc = syscall(__NR_setns, netns_fd, 0);
+    if (rc < 0) {
+        int saved = errno;
+        close(oldns);
+        errno = saved;
+        return -1;
+    }
+    if (set_interface_up(peer_name)) {
+        if (syscall(__NR_setns, oldns, 0) < 0) {
+            fprintf(stderr, "could not restore the namespace: %s", strerror(errno));
+            exit(1);
+        };
+        int saved = errno;
+        close(oldns);
+        errno = saved;
+        return -1;
+    };
+
+    int peer_idx = if_nametoindex(peer_name);
+    if (!peer_idx) {
+        int saved = errno;
+        if (syscall(__NR_setns, oldns, 0) < 0) {
+            fprintf(stderr, "could not restore the namespace: %s", strerror(errno));
+            exit(1);
+        };
+        close(oldns);
+        errno = saved;
+        return -1;
+    };
+
+    rc = syscall(__NR_setns, oldns, 0);
+    if (rc < 0) {
+        fprintf(stderr, "could not restore the namespace: %s", strerror(errno));
+        exit(1);
+    };
+    close(oldns);
+    return peer_idx;
+}
+
+int veth_netlink_newroute(int netlink_fd,
+                          int ifindex,
+                          int rtm_scope, // link
+                          int rtm_table, // main table
+                          char rtm_dst_len, // 32
+                          u32 pod_ip,
+                          u32 gateway_ip)
+{
+    struct {
+        struct nlmsghdr h;
+        struct rtmsg r;
+        char attrs[64];
+    } req = {
+        .h = {
+            .nlmsg_len = NLMSG_LENGTH(sizeof req.r),
+            .nlmsg_type = RTM_NEWROUTE,
+            .nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK |
+                           NLM_F_CREATE | NLM_F_REPLACE,
+            .nlmsg_seq = 1,
+        },
+        .r = {
+            .rtm_family = AF_INET,
+            .rtm_dst_len = rtm_dst_len,
+            .rtm_table = rtm_table,
+            .rtm_protocol = RTPROT_STATIC,
+            .rtm_scope = rtm_scope,
+            .rtm_type = RTN_UNICAST,
+        },
+    };
+
+    u32 pod_ip_n = htonl(pod_ip);
+    if (!add_attr(&req.h, sizeof req, RTA_DST, &pod_ip_n,  sizeof pod_ip_n))
+        return -1;
+    if (!add_attr(&req.h, sizeof req, RTA_OIF, &ifindex, sizeof ifindex))
+        return -1;
+
+    u32 gw_ip_n = htonl(gateway_ip);
+    if (gateway_ip)
+        if (!add_attr(&req.h, sizeof req, RTA_GATEWAY, &gw_ip_n, sizeof gw_ip_n))
+            return -1;
+
+    struct sockaddr_nl kernel = {
+        .nl_family = AF_NETLINK,
+    };
+    if (sendto(netlink_fd, &req, req.h.nlmsg_len, 0, (struct sockaddr *)&kernel, sizeof kernel) < 0) {
+        int saved = errno;
+        errno = saved;
+        return -1;
+    }
+
+    char msg[1024 * 1024];
+    ssize_t received = recv(netlink_fd, &msg, sizeof msg, 0);
+    if (!received || received < 0) {
+        int saved = errno;
         errno = saved;
         return -1;
     }
@@ -186,16 +302,66 @@ int create_veth_peer(const char *host_name,
         return -1;
     }
 
-    int oldns = open("/proc/self/ns/net", O_RDONLY);
-    if (oldns < 0)
+    return 0;
+}
+
+int veth_netlink_newaddr(int netlink_fd,
+                         int ifindex,
+                         u32 pod_ip)
+{
+    struct {
+        struct nlmsghdr h;
+        struct ifaddrmsg r;
+        char attrs[64];
+    } req = {
+        .h = {
+            .nlmsg_len = NLMSG_LENGTH(sizeof req.r),
+            .nlmsg_type = RTM_NEWADDR,
+            .nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK |
+                           NLM_F_CREATE | NLM_F_REPLACE,
+            .nlmsg_seq = 1,
+        },
+        .r = {
+            .ifa_family = AF_INET,
+            .ifa_prefixlen = 32,
+            .ifa_flags = 0,
+            .ifa_scope = RT_SCOPE_UNIVERSE,
+            .ifa_index = ifindex,
+        },
+    };
+
+    u32 pod_ip_n = htonl(pod_ip);
+    if (!add_attr(&req.h, sizeof req, IFA_LOCAL,   &pod_ip_n, sizeof pod_ip_n))
+        return -1;
+    if (!add_attr(&req.h, sizeof req, IFA_ADDRESS, &pod_ip_n, sizeof pod_ip_n))
         return -1;
 
-    int rc = syscall(__NR_setns, netns_fd, 0);
-    if (rc < 0)
+    struct sockaddr_nl kernel = {
+        .nl_family = AF_NETLINK,
+    };
+    if (sendto(netlink_fd, &req, req.h.nlmsg_len, 0, (struct sockaddr *)&kernel, sizeof kernel) < 0) {
+        int saved = errno;
+        errno = saved;
         return -1;
-    if (set_interface_up(peer_name)) return -1;
-    rc = syscall(__NR_setns, oldns, 0);
-    if (rc < 0)
+    }
+
+    char msg[1024 * 1024];
+    ssize_t received = recv(netlink_fd, &msg, sizeof msg, 0);
+    if (!received || received < 0) {
+        int saved = errno;
+        errno = saved;
         return -1;
+    }
+
+    struct nlmsghdr *h = (struct nlmsghdr *)&msg[0];
+    if (h->nlmsg_type != NLMSG_ERROR) {
+        errno = EPROTO;
+        return -1;
+    }
+    struct nlmsgerr *error = (void*)(h + 1);
+    if (error->error) {
+        errno = -error->error;
+        return -1;
+    }
     return 0;
 }
